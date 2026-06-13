@@ -33,12 +33,10 @@ async function moveMouseHumanLike(page, element) {
   const box = await element.boundingBox();
   if (!box) return false;
 
-  // Start from a random position near the center of the viewport
   const viewport = page.viewportSize();
   const startX = viewport.width / 2 + getRandomDelay(-100, 100);
   const startY = viewport.height / 2 + getRandomDelay(-100, 100);
   
-  // Target a random point within the element's bounding box
   const endX = box.x + box.width * (0.2 + Math.random() * 0.6);
   const endY = box.y + box.height * (0.2 + Math.random() * 0.6);
 
@@ -79,7 +77,7 @@ async function likePin(page, maxLikes, currentLikes) {
         await moveMouseHumanLike(page, likeButton);
         await page.waitForTimeout(getRandomDelay(200, 500)); // Pause before clicking
         await likeButton.click();
-        logger.info(`Liked a pin. (${currentLikes + 1}/${maxLikes})`);
+        logger.info(`❤️ Liked a pin. (${currentLikes + 1}/${maxLikes})`);
         return currentLikes + 1;
       }
     }
@@ -101,7 +99,7 @@ async function savePin(page, maxSaves, currentSaves) {
         await moveMouseHumanLike(page, saveButton);
         await page.waitForTimeout(getRandomDelay(200, 500));
         await saveButton.click();
-        logger.info(`Saved a pin. (${currentSaves + 1}/${maxSaves})`);
+        logger.info(`📌 Saved a pin. (${currentSaves + 1}/${maxSaves})`);
         return currentSaves + 1;
       }
     }
@@ -123,7 +121,7 @@ async function followUser(page, maxFollows, currentFollows) {
         await moveMouseHumanLike(page, followButton);
         await page.waitForTimeout(getRandomDelay(300, 600));
         await followButton.click();
-        logger.info(`Followed a user. (${currentFollows + 1}/${maxFollows})`);
+        logger.info(`👤 Followed a user. (${currentFollows + 1}/${maxFollows})`);
         return currentFollows + 1;
       }
     }
@@ -134,48 +132,73 @@ async function followUser(page, maxFollows, currentFollows) {
 }
 
 // Main loop: Browse home feed or search and perform actions
-async function runEngagementLoop(page, config) {
-  let likes = 0;
-  let saves = 0;
-  let follows = 0;
+async function runEngagementLoop(page, config, keywords) {
+  let totalLikes = 0;
+  let totalSaves = 0;
+  let totalFollows = 0;
 
-  logger.info('Starting engagement loop...');
-  
-  await page.goto('https://www.pinterest.com/', { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(getRandomDelay(3000, 5000));
+  logger.info('🚀 Starting targeted engagement loop...');
 
-  const maxIterations = 20; // Prevent infinite loops
-  
-  for (let i = 0; i < maxIterations; i++) {
-    if (likes >= config.maxLikes && saves >= config.maxSaves && follows >= config.maxFollows) {
-      logger.info('All session limits reached. Stopping.');
+  // If no keywords provided, fallback to home feed
+  const targets = keywords && keywords.length > 0 ? keywords : [''];
+
+  for (const keyword of targets) {
+    if (totalLikes >= config.maxLikes && totalSaves >= config.maxSaves && totalFollows >= config.maxFollows) {
+      logger.info('🛑 All session limits reached. Stopping.');
       break;
     }
 
-    logger.info(`Iteration ${i + 1}/${maxIterations}. Scrolling and engaging...`);
+    if (keyword) {
+      logger.info(`🔍 Navigating to search results for: "${keyword}"`);
+      const searchUrl = `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(keyword)}`;
+      await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
+    } else {
+      logger.info('🏠 Navigating to home feed...');
+      await page.goto('https://www.pinterest.com/', { waitUntil: 'domcontentloaded' });
+    }
     
-    // Scroll down to load new content
-    await humanScroll(page, getRandomDelay(600, 1000));
-    await page.waitForTimeout(getRandomDelay(config.minDelayBetweenActions, config.maxDelayBetweenActions));
+    await page.waitForTimeout(getRandomDelay(3000, 5000));
 
-    // Attempt actions on visible pins
-    if (config.actionLike) likes = await likePin(page, config.maxLikes, likes);
-    if (config.actionSave) saves = await savePin(page, config.maxSaves, saves);
+    const maxIterations = 15; // Per keyword/target
     
-    // Occasionally check for follow opportunities
-    if (config.actionFollow && Math.random() > 0.7) {
-      follows = await followUser(page, config.maxFollows, follows);
+    for (let i = 0; i < maxIterations; i++) {
+      if (totalLikes >= config.maxLikes && totalSaves >= config.maxSaves && totalFollows >= config.maxFollows) {
+        logger.info('🛑 All session limits reached. Stopping.');
+        break;
+      }
+
+      logger.info(`Iteration ${i + 1}/${maxIterations} for "${keyword || 'Home'}". Scrolling and engaging...`);
+      
+      // Scroll down to load new content
+      await humanScroll(page, getRandomDelay(600, 1000));
+      await page.waitForTimeout(getRandomDelay(config.minDelayBetweenActions, config.maxDelayBetweenActions));
+
+      // Attempt actions on visible pins
+      if (config.actionLike) totalLikes = await likePin(page, config.maxLikes, totalLikes);
+      if (config.actionSave) totalSaves = await savePin(page, config.maxSaves, totalSaves);
+      
+      // Occasionally check for follow opportunities
+      if (config.actionFollow && Math.random() > 0.7) {
+        totalFollows = await followUser(page, config.maxFollows, totalFollows);
+      }
+
+      // Random longer pause to simulate reading/thinking
+      if (Math.random() > 0.6) {
+        const longPause = getRandomDelay(config.minDelayBetweenPages, config.maxDelayBetweenPages);
+        logger.info(`☕ Taking a human-like pause for ${(longPause / 1000).toFixed(1)} seconds...`);
+        await page.waitForTimeout(longPause);
+      }
     }
 
-    // Random longer pause to simulate reading/thinking
-    if (Math.random() > 0.6) {
-      const longPause = getRandomDelay(config.minDelayBetweenPages, config.maxDelayBetweenPages);
-      logger.info(`Taking a human-like pause for ${(longPause / 1000).toFixed(1)} seconds...`);
-      await page.waitForTimeout(longPause);
+    // Pause between keywords to simulate natural browsing behavior
+    if (keyword && targets.indexOf(keyword) < targets.length - 1) {
+      const keywordPause = getRandomDelay(10000, 20000);
+      logger.info(`⏳ Finished keyword "${keyword}". Pausing for ${(keywordPause / 1000).toFixed(1)}s before next keyword...`);
+      await page.waitForTimeout(keywordPause);
     }
   }
 
-  logger.info(`Session complete. Total: ${likes} likes, ${saves} saves, ${follows} follows.`);
+  logger.info(`✅ Session complete. Total: ${totalLikes} likes, ${totalSaves} saves, ${totalFollows} follows.`);
 }
 
 module.exports = { runEngagementLoop, getRandomDelay };

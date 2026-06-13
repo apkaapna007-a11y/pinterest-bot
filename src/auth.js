@@ -4,13 +4,22 @@ const path = require('path');
 const fs = require('fs');
 const logger = require('./logger');
 
-const SESSION_FILE = path.join(__dirname, 'session.json');
-
 // Apply stealth plugin to playwright-extra
 chromium.use(stealth);
 
-async function getBrowser(isHeadless) {
-  return await chromium.launch({
+// Define persistent browser profile directory
+const USER_DATA_DIR = path.join(__dirname, '..', 'browser-profile');
+
+async function getAuthenticatedContext(isHeadless, email, password) {
+  // Ensure the profile directory exists
+  if (!fs.existsSync(USER_DATA_DIR)) {
+    fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+    logger.info(`Created new persistent browser profile directory at: ${USER_DATA_DIR}`);
+  } else {
+    logger.info(`Using existing persistent browser profile at: ${USER_DATA_DIR}`);
+  }
+
+  const contextOptions = {
     headless: isHeadless,
     args: [
       '--disable-blink-features=AutomationControlled',
@@ -19,19 +28,11 @@ async function getBrowser(isHeadless) {
       '--disable-web-security',
       '--disable-features=IsolateOrigins,site-per-process',
       '--window-size=1280,800'
-    ]
-  });
-}
-
-async function getContext(browser) {
-  // Realistic User-Agent and Client Hints
-  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-  
-  const contextOptions = {
-    userAgent: userAgent,
+    ],
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1280, height: 800 },
     locale: 'en-US',
-    timezoneId: 'America/New_York', // Adjust if needed, but consistent timezone is good
+    timezoneId: 'America/New_York',
     permissions: ['geolocation', 'notifications'],
     extraHTTPHeaders: {
       'Accept-Language': 'en-US,en;q=0.9',
@@ -41,14 +42,31 @@ async function getContext(browser) {
     }
   };
 
-  if (fs.existsSync(SESSION_FILE)) {
-    logger.info('Found existing session. Loading...');
-    contextOptions.storageState = SESSION_FILE;
+  logger.info('Launching browser with full persistent profile (cookies, cache, history, IndexedDB)...');
+  const context = await chromium.launchPersistentContext(USER_DATA_DIR, contextOptions);
+  
+  // Get the default page or create a new one
+  const page = context.pages().length > 0 ? context.pages()[0] : await context.newPage();
+
+  // Check if we need to log in
+  logger.info('Checking authentication status...');
+  await page.goto('https://www.pinterest.com/', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3000); // Let the page settle
+  
+  const isLoggedIn = await page.$('div[data-test-id="profile-dropdown"]') !== null;
+  
+  if (!isLoggedIn) {
+    logger.warn('Not authenticated in persistent profile. Initiating login flow...');
+    if (isHeadless) {
+      logger.error('Cannot perform interactive login in headless mode. Set HEADLESS=false in .env for the first run.');
+      throw new Error('Authentication failed: Headless mode active.');
+    }
+    await login(page, email, password);
   } else {
-    logger.info('No existing session found. Creating new context.');
+    logger.info('✅ Already authenticated via persistent browser profile.');
   }
   
-  return await browser.newContext(contextOptions);
+  return { context, page };
 }
 
 async function login(page, email, password) {
@@ -75,33 +93,7 @@ async function login(page, email, password) {
   // Wait until we are redirected away from the login page
   await page.waitForURL('https://www.pinterest.com/**', { timeout: 120000 });
   
-  logger.info('Login successful! Saving session state...');
-  await page.context().storageState({ path: SESSION_FILE });
-  logger.info('Session saved to session.json. Future runs will skip login.');
+  logger.info('✅ Login successful! Profile data (including 2FA tokens) is automatically saved to the browser-profile directory.');
 }
 
-async function ensureAuthenticated(browser, email, password, isHeadless) {
-  const context = await getContext(browser);
-  const page = await context.newPage();
-  
-  // Check if already logged in by checking for a logged-in element
-  await page.goto('https://www.pinterest.com/', { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(3000); // Let the page settle
-  
-  const isLoggedIn = await page.$('div[data-test-id="profile-dropdown"]') !== null;
-  
-  if (!isLoggedIn) {
-    logger.warn('Not authenticated. Initiating login flow...');
-    if (isHeadless) {
-      logger.error('Cannot perform interactive login in headless mode. Set HEADLESS=false in .env for the first run.');
-      throw new Error('Authentication failed: Headless mode active.');
-    }
-    await login(page, email, password);
-  } else {
-    logger.info('Already authenticated via saved session.');
-  }
-  
-  return { context, page };
-}
-
-module.exports = { getBrowser, ensureAuthenticated, SESSION_FILE };
+module.exports = { getAuthenticatedContext };

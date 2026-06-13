@@ -1,16 +1,22 @@
 require('dotenv').config();
 const logger = require('./logger');
-const { getBrowser, ensureAuthenticated } = require('./auth');
+const { getAuthenticatedContext } = require('./auth');
 const { runEngagementLoop } = require('./actions');
 
 async function main() {
-  logger.info('🚀 Starting Pinterest Bot v2.1.0 (Stealth Enhanced)');
+  logger.info('🚀 Starting Pinterest Bot v2.2.0 (Persistent Profile + Keyword Targeting)');
   
   // Validate environment variables
   if (!process.env.PINTEREST_EMAIL || !process.env.PINTEREST_PASSWORD) {
-    logger.error('Missing PINTEREST_EMAIL or PINTEREST_PASSWORD in .env file.');
+    logger.error('❌ Missing PINTEREST_EMAIL or PINTEREST_PASSWORD in .env file.');
     logger.info('Please copy .env.example to .env and fill in your credentials.');
     process.exit(1);
+  }
+
+  // Parse keywords from .env
+  let keywords = [];
+  if (process.env.TARGET_KEYWORDS) {
+    keywords = process.env.TARGET_KEYWORDS.split(',').map(k => k.trim()).filter(k => k.length > 0);
   }
 
   const config = {
@@ -26,30 +32,36 @@ async function main() {
     maxDelayBetweenPages: parseInt(process.env.MAX_DELAY_BETWEEN_PAGES, 10) || 20000,
   };
 
-  logger.info('Configuration loaded. Safety limits applied.');
+  logger.info('⚙️ Configuration loaded. Safety limits applied.');
+  if (keywords.length > 0) {
+    logger.info(`🎯 Targeting keywords: ${keywords.join(', ')}`);
+  } else {
+    logger.info('🏠 No keywords provided. Will target home feed.');
+  }
 
-  let browser;
+  let context;
   try {
     const isHeadless = process.env.HEADLESS === 'true';
     logger.info(`Launching browser (Headless: ${isHeadless})...`);
     
-    browser = await getBrowser(isHeadless);
-    const { context, page } = await ensureAuthenticated(
-      browser, 
+    const authResult = await getAuthenticatedContext(
+      isHeadless, 
       process.env.PINTEREST_EMAIL, 
-      process.env.PINTEREST_PASSWORD,
-      isHeadless
+      process.env.PINTEREST_PASSWORD
     );
+    
+    context = authResult.context;
+    const page = authResult.page;
 
-    logger.info('Browser ready with advanced stealth evasion. Beginning engagement loop...');
-    await runEngagementLoop(page, config);
+    logger.info('✅ Browser ready with advanced stealth evasion. Beginning engagement loop...');
+    await runEngagementLoop(page, config, keywords);
 
   } catch (error) {
-    logger.error('An error occurred during bot execution:', error.message);
+    logger.error('❌ An error occurred during bot execution:', error.message);
   } finally {
-    if (browser) {
-      logger.info('Closing browser...');
-      await browser.close();
+    if (context) {
+      logger.info('🔒 Closing browser and saving persistent profile...');
+      await context.close();
     }
     logger.info('🏁 Bot session finished.');
     process.exit(0);
@@ -58,7 +70,7 @@ async function main() {
 
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
-  logger.info('Received SIGINT. Shutting down gracefully...');
+  logger.info('🛑 Received SIGINT. Shutting down gracefully...');
   process.exit(0);
 });
 

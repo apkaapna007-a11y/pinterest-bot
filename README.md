@@ -27,8 +27,9 @@
 
 ## 🚀 Features
 
-- **🕵️ Advanced Stealth Mode**: Powered by `playwright-extra` and `puppeteer-extra-plugin-stealth`. Evades detection via `navigator.webdriver` masking, realistic User-Agent client hints, WebGL/Canvas fingerprinting protection, and Bezier-curve mouse movements that perfectly simulate human cursor behavior.
-- **💾 Session Persistence**: Saves your authenticated browser state (including 2FA tokens) after the first run. No need to re-enter credentials or solve CAPTCHAs on subsequent runs.
+- **🕵️ Advanced Stealth Mode**: Powered by `playwright-extra` and `puppeteer-extra-plugin-stealth`. Evades detection via `navigator.webdriver` masking, realistic User-Agent client hints, and Bezier-curve mouse movements that perfectly simulate human cursor behavior.
+- **💾 Full Browser Profile Persistence**: Unlike basic cookie saving, this bot saves the *entire* browser profile (cache, IndexedDB, browsing history, fonts). This makes the browser look like a legitimate, long-standing user profile, which is a massive trust signal to anti-bot systems.
+- **🎯 Keyword & Hashtag Targeting**: Instead of blindly scrolling the home feed, the bot can navigate to specific search results (e.g., "minimalist decor", "vegan recipes") and engage only with highly relevant content, driving targeted traffic to your profile.
 - **🎯 Configurable Actions**: Independently toggle auto-following, auto-liking, and auto-saving (repinning) based on your growth strategy.
 - **🛡️ Built-in Safety Limits**: Hard caps on actions per session (e.g., max 15 follows, 30 likes) to protect your account health and mimic organic user behavior.
 - **🧩 Modular Architecture**: Clean separation of authentication (`auth.js`), engagement logic (`actions.js`), and logging (`logger.js`) for easy customization and extension.
@@ -66,7 +67,7 @@ Run the bot with the browser visible:
 ```shell
 npm start
 ```
-*If Pinterest prompts for 2FA or a CAPTCHA, complete it in the visible browser window. The bot will automatically detect the successful login and save the session state to `src/session.json`.*
+*If Pinterest prompts for 2FA or a CAPTCHA, complete it in the visible browser window. The bot will automatically detect the successful login and save the entire browser profile to the `browser-profile/` directory.*
 
 ### 5. Subsequent Runs (Headless)
 Once authenticated, you can safely set `HEADLESS=true` in your `.env` file to run the bot silently in the background:
@@ -82,6 +83,7 @@ npm start
 |----------|-------------|---------------------|
 | `PINTEREST_EMAIL` | Your Pinterest account email | *Required* |
 | `PINTEREST_PASSWORD` | Your Pinterest account password | *Required* |
+| `TARGET_KEYWORDS` | Comma-separated search terms (e.g., `home decor, diy`) | *Recommended* |
 | `ACTION_LIKE` | Enable auto-liking (`true`/`false`) | `true` |
 | `ACTION_SAVE` | Enable auto-saving/repinning (`true`/`false`) | `true` |
 | `ACTION_FOLLOW` | Enable auto-following (`true`/`false`) | `true` |
