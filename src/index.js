@@ -4,7 +4,7 @@ const { getBrowser, ensureAuthenticated } = require('./auth');
 const { runEngagementLoop } = require('./actions');
 
 async function main() {
-  logger.info('🚀 Starting Pinterest Bot v2.0.0');
+  logger.info('🚀 Starting Pinterest Bot v2.1.0 (Stealth Enhanced)');
   
   // Validate environment variables
   if (!process.env.PINTEREST_EMAIL || !process.env.PINTEREST_PASSWORD) {
@@ -41,12 +41,7 @@ async function main() {
       isHeadless
     );
 
-    // Add stealth evasion: Override navigator.webdriver
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => false });
-    });
-
-    logger.info('Browser ready. Beginning engagement loop...');
+    logger.info('Browser ready with advanced stealth evasion. Beginning engagement loop...');
     await runEngagementLoop(page, config);
 
   } catch (error) {

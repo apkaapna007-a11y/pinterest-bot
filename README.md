@@ -27,7 +27,7 @@
 
 ## 🚀 Features
 
-- **🕵️ Stealth Mode**: Implements human-like scrolling, randomized action delays, and `navigator.webdriver` masking to evade basic bot detection mechanisms.
+- **🕵️ Advanced Stealth Mode**: Powered by `playwright-extra` and `puppeteer-extra-plugin-stealth`. Evades detection via `navigator.webdriver` masking, realistic User-Agent client hints, WebGL/Canvas fingerprinting protection, and Bezier-curve mouse movements that perfectly simulate human cursor behavior.
 - **💾 Session Persistence**: Saves your authenticated browser state (including 2FA tokens) after the first run. No need to re-enter credentials or solve CAPTCHAs on subsequent runs.
 - **🎯 Configurable Actions**: Independently toggle auto-following, auto-liking, and auto-saving (repinning) based on your growth strategy.
 - **🛡️ Built-in Safety Limits**: Hard caps on actions per session (e.g., max 15 follows, 30 likes) to protect your account health and mimic organic user behavior.
