@@ -1,36 +1,32 @@
 {
-  "name": "somiibo-downloader",
-  "version": "1.0.0",
-  "description": "Download Somiibo, a free social media automation platform that organically grows your online presence and gets you more followers.",
+  "name": "pinterest-bot",
+  "version": "2.0.0",
+  "description": "A stealthy, modular Pinterest automation bot for organic growth and engagement.",
   "main": "src/index.js",
   "scripts": {
-    "start": "node -e \"require('app-downloader')()\""
+    "start": "node src/index.js",
+    "install-browsers": "npx playwright install chromium",
+    "login": "node src/auth.js --login"
   },
   "engines": {
     "node": ">=18"
   },
-  "downloads": {
-    "darwin": "https://github.com/somiibo/download-server/releases/download/installer/Somiibo.dmg",
-    "win32": "https://github.com/somiibo/download-server/releases/download/installer/Somiibo-Setup.exe",
-    "linux": "https://github.com/somiibo/download-server/releases/download/installer/Somiibo_amd64.deb"
-  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/somiibo/download-server.git"
+    "url": "git+https://github.com/apkaapna007-a11y/pinterest-bot.git"
   },
   "keywords": [
-    "management",
-    "backend",
-    "frontend",
-    "productivity"
+    "pinterest",
+    "automation",
+    "bot",
+    "playwright",
+    "growth"
   ],
-  "author": "Somiibo",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/somiibo/somiibo-microservice-template/issues"
-  },
-  "homepage": "https://somiibo.com",
+  "author": "Dr Zeeshan Islam",
+  "license": "MIT",
   "dependencies": {
-    "app-downloader": "^1.0.0"
+    "dotenv": "^16.3.1",
+    "playwright": "^1.40.0",
+    "winston": "^3.11.0"
   }
 }

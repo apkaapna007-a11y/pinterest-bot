@@ -1,129 +1,70 @@
-  // Modules
-const os = require('os');
-const fs = require('fs-jetpack');
-const path = require('path');
-const fetch = require('wonderful-fetch');
-const downloads = require('downloads-folder');
-const powertools = require('node-powertools');
+require('dotenv').config();
+const logger = require('./logger');
+const { getBrowser, ensureAuthenticated } = require('./auth');
+const { runEngagementLoop } = require('./actions');
 
-// Main
-module.exports = async function () {
-  const interval = setInterval(() => {
-    log('Still downloading, please be patient! :)');
-  }, 3000);
+async function main() {
+  logger.info('🚀 Starting Pinterest Bot v2.0.0');
+  
+  // Validate environment variables
+  if (!process.env.PINTEREST_EMAIL || !process.env.PINTEREST_PASSWORD) {
+    logger.error('Missing PINTEREST_EMAIL or PINTEREST_PASSWORD in .env file.');
+    logger.info('Please copy .env.example to .env and fill in your credentials.');
+    process.exit(1);
+  }
 
+  const config = {
+    actionLike: process.env.ACTION_LIKE === 'true',
+    actionSave: process.env.ACTION_SAVE === 'true',
+    actionFollow: process.env.ACTION_FOLLOW === 'true',
+    maxLikes: parseInt(process.env.MAX_LIKES_PER_SESSION, 10) || 30,
+    maxSaves: parseInt(process.env.MAX_SAVES_PER_SESSION, 10) || 20,
+    maxFollows: parseInt(process.env.MAX_FOLLOWS_PER_SESSION, 10) || 15,
+    minDelayBetweenActions: parseInt(process.env.MIN_DELAY_BETWEEN_ACTIONS, 10) || 3000,
+    maxDelayBetweenActions: parseInt(process.env.MAX_DELAY_BETWEEN_ACTIONS, 10) || 8000,
+    minDelayBetweenPages: parseInt(process.env.MIN_DELAY_BETWEEN_PAGES, 10) || 10000,
+    maxDelayBetweenPages: parseInt(process.env.MAX_DELAY_BETWEEN_PAGES, 10) || 20000,
+  };
+
+  logger.info('Configuration loaded. Safety limits applied.');
+
+  let browser;
   try {
-    // Clear
-    clear();
+    const isHeadless = process.env.HEADLESS === 'true';
+    logger.info(`Launching browser (Headless: ${isHeadless})...`);
+    
+    browser = await getBrowser(isHeadless);
+    const { context, page } = await ensureAuthenticated(
+      browser, 
+      process.env.PINTEREST_EMAIL, 
+      process.env.PINTEREST_PASSWORD,
+      isHeadless
+    );
 
-    // Download
-    await download();
+    // Add stealth evasion: Override navigator.webdriver
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    });
 
-    // Launch
-    launch();
+    logger.info('Browser ready. Beginning engagement loop...');
+    await runEngagementLoop(page, config);
 
-    return
-  } catch (e) {
-    error('Failed to download:', e);
-    error('Ensure you are using the right Node.js version');
-    error('Alternatively, download the app manually from:', getURL());
+  } catch (error) {
+    logger.error('An error occurred during bot execution:', error.message);
   } finally {
-    clearInterval(interval);
-  }
-};
-
-if (require.main === module) {
-  module.exports();
-}
-
-function clear() {
-  const location = getDownloadPath();
-
-  log(`Clearing ${location}`)
-
-  fs.remove(location);
-}
-
-function download(location) {
-  return new Promise(async function(resolve, reject) {
-    const location = getDownloadPath();
-    const url = getURL();
-
-    log(`Downloading app to ${location} from ${url}`);
-
-    // Process
-    const res = await fetch(url);
-    const fileStream = fs.createWriteStream(location);
-
-    await new Promise((resolve, reject) => {
-      res.body.pipe(fileStream);
-      res.body.on('error', reject);
-
-      fileStream.on('finish', resolve);
-    })
-    .then((r) => {
-      log('Download finished!');
-    })
-    .catch((e) => {
-      error('Download failed!', e);
-    })
-
-    return resolve();
-  });
-}
-
-function getDownloadPath() {
-  const url = getURL();
-
-  return path.join(downloads(), url.split('/').slice(-1)[0]);
-}
-
-function getURL() {
-  const name = os.type();
-
-  if (name === 'Darwin') {
-    return 'https://github.com/somiibo/download-server/releases/download/installer/Somiibo.dmg'
-  } else if (name === 'Windows_NT') {
-    return 'https://github.com/somiibo/download-server/releases/download/installer/Somiibo-Setup.exe'
-  } else {
-    return 'https://github.com/somiibo/download-server/releases/download/installer/Somiibo_amd64.deb'
-  }
-}
-
-function launch() {
-  const location = getDownloadPath();
-  const name = os.type();
-
-  log(`Launching app at ${location}`)
-
-  try {
-    if (name === 'Darwin') {
-      powertools.execute(`open "${location}"`)
-        .then(() => {
-          log('Drag the app to your Applications folder to install it');
-        })
-    } else if (name === 'Windows_NT') {
-      powertools.execute(`"${location}"`)
-        .then(() => {
-
-        })
-    } else {
-      powertools.execute(`sudo apt install "${location}"`)
-        .then(() => {
-          powertools.execute(`restart-manager`).catch(e => {console.error(e)})
-        })
+    if (browser) {
+      logger.info('Closing browser...');
+      await browser.close();
     }
-  } catch (e) {
-    error('Application failed to execute:', e);
-    console.log('\n\n\n')
-    log(`Please launch the app manually: ${location}`);
+    logger.info('🏁 Bot session finished.');
+    process.exit(0);
   }
 }
 
-function log() {
-  console.log(`[${new Date().toLocaleTimeString()}]`, ...arguments)
-}
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+  logger.info('Received SIGINT. Shutting down gracefully...');
+  process.exit(0);
+});
 
-function error() {
-  console.error(`[${new Date().toLocaleTimeString()}]`, ...arguments)
-}
+main();
